@@ -25,6 +25,5 @@ export class ModelLoader {
     if (!isValidFormat) {
         throw new Error('Unsuppoted file format. Please use: $this july')
 
-        
     }
 }
