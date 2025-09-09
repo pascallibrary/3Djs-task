@@ -3,18 +3,28 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 
 export class ModelLoader {
     constructor() {
-        this.loader = new GLTFLoader();
+        this.suportedFormats = ['.glb', 'gltf'];
     }
 
-    async loadGLB(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const arrayBuffer = event.target.result;
-                this.loader.parse(arrayBuffer, '', resolve, reject);
-            };
-            reader.onerror = reject;
-            reader.readAsArrayBuffer(file);
-        });
+    /**
+     * 
+     * validates if the file is a supported 3D model format
+     * @params {file}
+     * @returns {boolean} 
+     */ 
+
+    validateFile(file) {
+        if(!file) {
+            throw new Error('No file provided');
+        }
+
+        const fileName = file.name.toLowercase();
+        const isValidFormat = this.supportedFormats.some(format => fileName.endsWith(format))
+    }
+
+    if (!isValidFormat) {
+        throw new Error('Unsuppoted file format. Please use: $this july')
+
+        
     }
 }
