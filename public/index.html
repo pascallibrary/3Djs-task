@@ -4,40 +4,135 @@
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
-    <meta
-      name="description"
-      content="Web site created using create-react-app"
-    />
+    <meta name="theme-color" content="#1f2937" />
+    <meta name="description" content="SwiftXR 3D Editor - Upload, explore, and label 3D models with interactive hotspots" />
+    <meta name="keywords" content="3D, editor, GLB, GLTF, hotspots, Three.js, React, SwiftXR" />
+    <meta name="author" content="SwiftXR Technical Assessment" />
+    
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="SwiftXR 3D Editor" />
+    <meta property="og:description" content="Interactive 3D model viewer and hotspot editor built with React and Three.js" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://your-username.github.io/swiftxr-3d-editor" />
+    
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="SwiftXR 3D Editor" />
+    <meta name="twitter:description" content="Interactive 3D model viewer and hotspot editor" />
+    
+    <!-- Apple Touch Icon -->
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
-    <!--
-      manifest.json provides metadata used when your web app is installed on a
-      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
-    -->
+    
+    <!-- Manifest -->
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <!--
-      Notice the use of %PUBLIC_URL% in the tags above.
-      It will be replaced with the URL of the `public` folder during the build.
-      Only files inside the `public` folder can be referenced from the HTML.
-
-      Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
-      work correctly both with client-side routing and a non-root public URL.
-      Learn how to configure a non-root public URL by running `npm run build`.
-    -->
-    <title>React App</title>
+    
+    <!-- Preload critical resources -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
+    
+    <title>SwiftXR 3D Editor</title>
+    
+    <!-- Custom CSS for loading screen -->
+    <style>
+      /* Loading screen styles */
+      #loading-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        color: white;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      }
+      
+      .loading-logo {
+        width: 80px;
+        height: 80px;
+        border: 4px solid #374151;
+        border-top: 4px solid #3b82f6;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+      }
+      
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      
+      .loading-text {
+        font-size: 1.2em;
+        font-weight: 600;
+        margin-bottom: 10px;
+      }
+      
+      .loading-subtext {
+        font-size: 0.9em;
+        color: #9ca3af;
+      }
+      
+      /* Hide loading screen when React app loads */
+      .loaded #loading-screen {
+        display: none;
+      }
+    </style>
   </head>
   <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <noscript>
+      <div style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #1f2937;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: Arial, sans-serif;
+        text-align: center;
+        padding: 20px;
+        box-sizing: border-box;
+      ">
+        <div>
+          <h1>JavaScript Required</h1>
+          <p>SwiftXR 3D Editor requires JavaScript to run.</p>
+          <p>Please enable JavaScript in your browser and refresh the page.</p>
+        </div>
+      </div>
+    </noscript>
+    
+    <!-- Loading screen (shown before React app loads) -->
+    <div id="loading-screen">
+      <div class="loading-logo"></div>
+      <div class="loading-text">Loading SwiftXR 3D Editor</div>
+      <div class="loading-subtext">Initializing 3D environment...</div>
+    </div>
+    
+    <!-- React app root -->
     <div id="root"></div>
-    <!--
-      This HTML file is a template.
-      If you open it directly in the browser, you will see an empty page.
-
-      You can add webfonts, meta tags, or analytics to this file.
-      The build step will place the bundled scripts into the <body> tag.
-
-      To begin the development, run `npm start` or `yarn start`.
-      To create a production bundle, use `npm run build` or `yarn build`.
-    -->
+    
+    <!-- Script to hide loading screen when React loads -->
+    <script>
+      // Hide loading screen when React app is ready
+      window.addEventListener('load', function() {
+        setTimeout(function() {
+          document.body.classList.add('loaded');
+        }, 500);
+      });
+      
+      // Fallback: hide loading screen after maximum time
+      setTimeout(function() {
+        document.body.classList.add('loaded');
+      }, 5000);
+    </script>
   </body>
 </html>

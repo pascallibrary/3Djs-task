@@ -1,0 +1,42 @@
+{
+  "short_name": "SwiftXR 3D Editor",
+  "name": "SwiftXR 3D Model Editor and Hotspot Viewer",
+  "description": "Interactive 3D model viewer and hotspot editor built with React and Three.js for SwiftXR technical assessment",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "logo192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "logo512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#1f2937",
+  "background_color": "#111827",
+  "orientation": "landscape-primary",
+  "categories": ["utilities", "developer", "3d", "graphics"],
+  "screenshots": [
+    {
+      "src": "screenshot1.png",
+      "type": "image/png",
+      "sizes": "1280x720",
+      "label": "SwiftXR 3D Editor main interface"
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false,
+  "dir": "ltr",
+  "lang": "en-US",
+  "scope": "/",
+  "id": "swiftxr-3d-editor"
+}
