@@ -505,7 +505,17 @@ const SwiftXR3DEditor = () => {
           </div>
         )}
 
-        {/* Hotspot Mode Indicator */}
+        {/* Debug Info (remove in production) */}
+        {showStats && currentModel && (
+          <div className="absolute bottom-4 left-4 bg-black bg-opacity-80 text-white p-3 rounded-lg text-xs font-mono max-w-sm">
+            <div className="mb-2 font-bold">Model Debug Info:</div>
+            <div>Visible: {currentModel.visible ? 'Yes' : 'No'}</div>
+            <div>Position: {`${currentModel.position.x.toFixed(2)}, ${currentModel.position.y.toFixed(2)}, ${currentModel.position.z.toFixed(2)}`}</div>
+            <div>Scale: {`${currentModel.scale.x.toFixed(2)}, ${currentModel.scale.y.toFixed(2)}, ${currentModel.scale.z.toFixed(2)}`}</div>
+            <div>Children: {currentModel.children.length}</div>
+            <div>In Scene: {sceneRef.current && sceneRef.current.children.includes(currentModel) ? 'Yes' : 'No'}</div>
+          </div>
+        )}
         {isAddingHotspot && (
           <div className="absolute top-4 right-4 bg-yellow-500 text-black px-4 py-2 rounded-lg shadow-lg">
             <div className="flex items-center gap-2">

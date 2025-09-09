@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+// Import GLTFLoader from examples
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 
 /**
  * ModelLoader Utility Class
@@ -9,6 +12,12 @@ import * as THREE from 'three';
 export class ModelLoader {
   constructor() {
     this.supportedFormats = ['.glb', '.gltf'];
+    this.gltfLoader = new GLTFLoader();
+    this.dracoLoader = new DRACOLoader();
+    
+    // Setup DRACO decoder for compressed models
+    this.dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+    this.gltfLoader.setDRACOLoader(this.dracoLoader);
   }
 
   /**
@@ -40,85 +49,7 @@ export class ModelLoader {
   }
 
   /**
-   * Creates a demo 3D model for testing purposes
-   * (In production, you would use GLTFLoader here)
-   * @returns {THREE.Group} - A Three.js group containing the demo model
-   */
-  createDemoModel() {
-    const group = new THREE.Group();
-
-    // Main body - Box geometry
-    const bodyGeometry = new THREE.BoxGeometry(2, 2, 2);
-    const bodyMaterial = new THREE.MeshLambertMaterial({ 
-      color: 0x4CAF50,
-      transparent: false
-    });
-    const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-    body.castShadow = true;
-    body.receiveShadow = true;
-    group.add(body);
-
-    // Top sphere
-    const sphereGeometry = new THREE.SphereGeometry(0.6, 16, 16);
-    const sphereMaterial = new THREE.MeshLambertMaterial({ 
-      color: 0xFF5722
-    });
-    const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-    sphere.position.set(0, 1.8, 0);
-    sphere.castShadow = true;
-    group.add(sphere);
-
-    // Side cylinders
-    const cylinderGeometry = new THREE.CylinderGeometry(0.3, 0.3, 1.5, 8);
-    const cylinderMaterial = new THREE.MeshLambertMaterial({ 
-      color: 0x2196F3
-    });
-    
-    const leftCylinder = new THREE.Mesh(cylinderGeometry, cylinderMaterial);
-    leftCylinder.position.set(-1.5, 0, 0);
-    leftCylinder.castShadow = true;
-    group.add(leftCylinder);
-
-    const rightCylinder = new THREE.Mesh(cylinderGeometry, cylinderMaterial);
-    rightCylinder.position.set(1.5, 0, 0);
-    rightCylinder.castShadow = true;
-    group.add(rightCylinder);
-
-    // Base platform
-    const baseGeometry = new THREE.CylinderGeometry(2.5, 2.5, 0.2, 16);
-    const baseMaterial = new THREE.MeshLambertMaterial({ 
-      color: 0x607D8B,
-      transparent: true,
-      opacity: 0.7
-    });
-    const base = new THREE.Mesh(baseGeometry, baseMaterial);
-    base.position.set(0, -1.2, 0);
-    base.receiveShadow = true;
-    group.add(base);
-
-    // Add some details - small cubes
-    const detailGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
-    const detailMaterial = new THREE.MeshLambertMaterial({ 
-      color: 0xFFC107
-    });
-
-    for (let i = 0; i < 8; i++) {
-      const detail = new THREE.Mesh(detailGeometry, detailMaterial);
-      const angle = (i / 8) * Math.PI * 2;
-      detail.position.set(
-        Math.cos(angle) * 1.2,
-        0.5,
-        Math.sin(angle) * 1.2
-      );
-      detail.castShadow = true;
-      group.add(detail);
-    }
-
-    return group;
-  }
-
-  /**
-   * Loads a GLB file and returns a Three.js model
+   * Loads a GLB/GLTF file and returns a Three.js model
    * @param {File} file - The GLB file to load
    * @returns {Promise<THREE.Group>} - Promise resolving to the loaded model
    */
@@ -132,21 +63,60 @@ export class ModelLoader {
         
         reader.onload = (event) => {
           try {
-            // In a real implementation, you would use GLTFLoader:
-            // const loader = new GLTFLoader();
-            // loader.parse(event.target.result, '', (gltf) => {
-            //   resolve(gltf.scene);
-            // }, reject);
-
-            // For this demo, we'll create a representative model
-            // This simulates the loading process
-            setTimeout(() => {
-              const demoModel = this.createDemoModel();
-              resolve(demoModel);
-            }, 1000); // Simulate loading time
+            const arrayBuffer = event.target.result;
+            
+            // Use GLTFLoader to parse the file
+            this.gltfLoader.parse(
+              arrayBuffer, 
+              '', // resource path
+              (gltf) => {
+                // Successfully loaded GLTF
+                console.log('GLTF loaded successfully:', gltf);
+                
+                // Extract the scene from GLTF
+                const model = gltf.scene.clone(); // Clone to avoid issues
+                
+                // Ensure model is visible
+                model.visible = true;
+                
+                // Force update all materials and geometries
+                model.traverse((child) => {
+                  if (child.isMesh) {
+                    child.visible = true;
+                    
+                    if (child.geometry) {
+                      child.geometry.computeBoundingBox();
+                      child.geometry.computeBoundingSphere();
+                    }
+                    
+                    if (child.material) {
+                      const materials = Array.isArray(child.material) ? child.material : [child.material];
+                      materials.forEach(mat => {
+                        mat.needsUpdate = true;
+                      });
+                    }
+                  }
+                });
+                
+                // Add metadata
+                model.userData = {
+                  ...model.userData,
+                  fileName: file.name,
+                  fileSize: file.size,
+                  animations: gltf.animations || [],
+                  isGLTFModel: true
+                };
+                
+                resolve(model);
+              },
+              (error) => {
+                console.error('GLTF parsing error:', error);
+                reject(new Error(`Failed to parse GLB file: ${error.message || 'Unknown error'}`));
+              }
+            );
 
           } catch (error) {
-            reject(new Error(`Failed to parse GLB file: ${error.message}`));
+            reject(new Error(`Failed to process GLB file: ${error.message}`));
           }
         };
 
@@ -197,8 +167,79 @@ export class ModelLoader {
    */
   scaleModelToSize(model, targetSize = 4) {
     const bounds = this.getModelBounds(model);
-    const scale = targetSize / bounds.maxDimension;
-    model.scale.multiplyScalar(scale);
+    if (bounds.maxDimension > 0) {
+      const scale = targetSize / bounds.maxDimension;
+      model.scale.multiplyScalar(scale);
+    }
+  }
+
+  /**
+   * Enables shadows for all meshes in the model
+   * @param {THREE.Object3D} model - The Three.js model
+   */
+  enableShadows(model) {
+    model.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        
+        // Ensure materials are properly configured
+        if (child.material) {
+          if (Array.isArray(child.material)) {
+            child.material.forEach(mat => {
+              mat.needsUpdate = true;
+            });
+          } else {
+            child.material.needsUpdate = true;
+          }
+        }
+      }
+    });
+  }
+
+  /**
+   * Fixes common issues with loaded models
+   * @param {THREE.Object3D} model - The Three.js model
+   */
+  fixModelIssues(model) {
+    model.traverse((child) => {
+      if (child.isMesh) {
+        // Fix materials that might not render properly
+        if (child.material) {
+          const materials = Array.isArray(child.material) ? child.material : [child.material];
+          
+          materials.forEach(material => {
+            // Ensure proper color space for textures
+            if (material.map) {
+              material.map.colorSpace = THREE.SRGBColorSpace;
+            }
+            if (material.normalMap) {
+              material.normalMap.colorSpace = THREE.LinearSRGBColorSpace;
+            }
+            
+            // Fix transparency issues
+            if (material.transparent || material.opacity < 1) {
+              material.transparent = true;
+              material.alphaTest = 0.01;
+            }
+            
+            material.needsUpdate = true;
+          });
+        }
+
+        // Fix geometry issues
+        if (child.geometry) {
+          // Compute normals if missing
+          if (!child.geometry.attributes.normal) {
+            child.geometry.computeVertexNormals();
+          }
+          
+          // Compute bounding box and sphere
+          child.geometry.computeBoundingBox();
+          child.geometry.computeBoundingSphere();
+        }
+      }
+    });
   }
 
   /**
@@ -211,8 +252,14 @@ export class ModelLoader {
       center = true,
       scale = true,
       targetSize = 4,
-      enableShadows = true
+      enableShadows = true,
+      fixIssues = true
     } = options;
+
+    // Fix common model issues first
+    if (fixIssues) {
+      this.fixModelIssues(model);
+    }
 
     // Center the model
     if (center) {
@@ -226,14 +273,116 @@ export class ModelLoader {
 
     // Enable shadows
     if (enableShadows) {
-      model.traverse((child) => {
-        if (child.isMesh) {
-          child.castShadow = true;
-          child.receiveShadow = true;
-        }
-      });
+      this.enableShadows(model);
     }
 
+    // Log model information
+    console.log('Model prepared:', {
+      bounds: this.getModelBounds(model),
+      children: model.children.length,
+      animations: model.userData.animations?.length || 0
+    });
+
     return model;
+  }
+
+  /**
+   * Dispose of model resources to free memory
+   * @param {THREE.Object3D} model - The model to dispose
+   */
+  dispose(model) {
+    if (!model) return;
+
+    model.traverse((child) => {
+      if (child.isMesh) {
+        // Dispose geometry
+        if (child.geometry) {
+          child.geometry.dispose();
+        }
+
+        // Dispose materials and textures
+        if (child.material) {
+          const materials = Array.isArray(child.material) ? child.material : [child.material];
+          
+          materials.forEach(material => {
+            // Dispose textures
+            Object.values(material).forEach(value => {
+              if (value && value.isTexture) {
+                value.dispose();
+              }
+            });
+            
+            // Dispose material
+            material.dispose();
+          });
+        }
+      }
+    });
+
+    // Remove from parent if it has one
+    if (model.parent) {
+      model.parent.remove(model);
+    }
+  }
+
+  /**
+   * Get model statistics
+   * @param {THREE.Object3D} model - The model to analyze
+   * @returns {Object} - Model statistics
+   */
+  getModelStats(model) {
+    let meshCount = 0;
+    let vertexCount = 0;
+    let faceCount = 0;
+    let materialCount = 0;
+    let textureCount = 0;
+
+    const materials = new Set();
+    const textures = new Set();
+
+    model.traverse((child) => {
+      if (child.isMesh) {
+        meshCount++;
+        
+        if (child.geometry) {
+          const positions = child.geometry.attributes.position;
+          if (positions) {
+            vertexCount += positions.count;
+          }
+          
+          const index = child.geometry.index;
+          if (index) {
+            faceCount += index.count / 3;
+          } else if (positions) {
+            faceCount += positions.count / 3;
+          }
+        }
+
+        if (child.material) {
+          const mats = Array.isArray(child.material) ? child.material : [child.material];
+          mats.forEach(mat => {
+            materials.add(mat);
+            
+            // Count textures
+            Object.values(mat).forEach(value => {
+              if (value && value.isTexture) {
+                textures.add(value);
+              }
+            });
+          });
+        }
+      }
+    });
+
+    return {
+      meshes: meshCount,
+      vertices: Math.round(vertexCount),
+      faces: Math.round(faceCount),
+      materials: materials.size,
+      textures: textures.size,
+      animations: model.userData.animations?.length || 0,
+      fileSize: model.userData.fileSize || 0,
+      fileName: model.userData.fileName || 'Unknown'
+    };
   }
 }

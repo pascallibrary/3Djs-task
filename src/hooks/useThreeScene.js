@@ -241,19 +241,57 @@ export const useThreeScene = (canvasRef) => {
   }, [updateCameraPosition]);
 
   const focusOnModel = useCallback((model) => {
-    if (!model || !cameraRef.current) return;
+    if (!model || !cameraRef.current) {
+      console.warn('Cannot focus on model - model or camera missing');
+      return;
+    }
+
+    // Force geometry computation
+    model.traverse((child) => {
+      if (child.geometry) {
+        child.geometry.computeBoundingBox();
+        child.geometry.computeBoundingSphere();
+      }
+    });
 
     const box = new THREE.Box3().setFromObject(model);
+    
+    // Check if bounding box is valid
+    if (box.isEmpty()) {
+      console.warn('Model bounding box is empty, using default camera position');
+      const defaultControls = {
+        distance: 8,
+        rotationX: 0.3,
+        rotationY: 0.5,
+        targetX: 0,
+        targetY: 0,
+        targetZ: 0
+      };
+      setCameraControls(defaultControls);
+      updateCameraPosition(cameraRef.current, defaultControls);
+      return;
+    }
+    
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z);
+    
+    // Calculate appropriate camera distance
+    const distance = Math.max(maxDim * 2.5, 5); // Minimum distance of 5
+    
+    console.log('Focusing on model:', {
+      center,
+      size,
+      maxDim,
+      distance
+    });
     
     const newControls = {
       ...cameraControls,
       targetX: center.x,
       targetY: center.y,
       targetZ: center.z,
-      distance: maxDim * 2.5
+      distance: distance
     };
     
     setCameraControls(newControls);
