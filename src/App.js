@@ -2,7 +2,12 @@ import React from 'react';
 import SwiftXR3DEditor from './components/SwiftXR3DEditor';
 import './App.css';
 
-
+/**
+ * Main App Component for SwiftXR 3D Editor
+ * 
+ * This is the root component that renders the entire 3D editor application.
+ * It provides the main container and imports the SwiftXR3DEditor component.
+ */
 function App() {
   return (
     <div className="App">
