@@ -41,7 +41,8 @@ export function useThreeScene(canvasRef) {
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.enablePan = true;
-    controls.enableZoom = false; // we’ll handle zoom manually
+    controls.enableZoom = true; // Enable zoom through OrbitControls
+    controls.enableRotate = false; // Disable automatic rotation, we'll handle it manually
     controlsRef.current = controls;
 
     // === Lights ===
@@ -86,28 +87,96 @@ export function useThreeScene(canvasRef) {
     };
   }, [canvasRef]);
 
-  // === Camera Controls ===
+  // === Manual Camera Controls ===
   const rotateCameraBy = (dx, dy) => {
-    if (controlsRef.current) {
-      controlsRef.current.rotateLeft(dx * 0.005);
-      controlsRef.current.rotateUp(dy * 0.005);
-    }
+    if (!controlsRef.current || !cameraRef.current) return;
+    
+    const controls = controlsRef.current;
+    const camera = cameraRef.current;
+    
+    // Get current spherical coordinates
+    const spherical = new THREE.Spherical();
+    const offset = new THREE.Vector3();
+    
+    // Calculate offset from target
+    offset.copy(camera.position).sub(controls.target);
+    spherical.setFromVector3(offset);
+    
+    // Apply rotation deltas
+    spherical.theta -= dx * 0.01; // Horizontal rotation
+    spherical.phi += dy * 0.01;   // Vertical rotation
+    
+    // Constrain phi to avoid flipping
+    spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
+    
+    // Convert back to cartesian coordinates
+    offset.setFromSpherical(spherical);
+    camera.position.copy(controls.target).add(offset);
+    
+    // Update controls
+    controls.update();
   };
 
   const panCameraBy = (dx, dy) => {
-    if (controlsRef.current) {
-      controlsRef.current.pan(dx * 0.01, dy * 0.01);
-    }
+    if (!controlsRef.current || !cameraRef.current) return;
+    
+    const controls = controlsRef.current;
+    const camera = cameraRef.current;
+    
+    // Get camera's right and up vectors
+    const cameraDirection = new THREE.Vector3();
+    camera.getWorldDirection(cameraDirection);
+    
+    const right = new THREE.Vector3();
+    right.crossVectors(cameraDirection, camera.up).normalize();
+    
+    const up = new THREE.Vector3();
+    up.crossVectors(right, cameraDirection).normalize();
+    
+    // Calculate pan distance based on camera distance from target
+    const distance = camera.position.distanceTo(controls.target);
+    const panSpeed = distance * 0.001;
+    
+    // Apply panning
+    const panOffset = new THREE.Vector3();
+    panOffset.addScaledVector(right, -dx * panSpeed);
+    panOffset.addScaledVector(up, dy * panSpeed);
+    
+    // Move both camera and target
+    camera.position.add(panOffset);
+    controls.target.add(panOffset);
+    
+    controls.update();
   };
 
   const zoomCameraBy = (delta) => {
     if (!cameraRef.current || !controlsRef.current) return;
+    
     const camera = cameraRef.current;
     const controls = controlsRef.current;
 
     if (camera.isPerspectiveCamera) {
-      const zoomFactor = delta > 0 ? 1.1 : 0.9;
-      camera.position.addScaledVector(camera.getWorldDirection(new THREE.Vector3()), delta > 0 ? zoomFactor : -zoomFactor);
+      // Calculate zoom direction (towards/away from target)
+      const direction = new THREE.Vector3();
+      direction.subVectors(controls.target, camera.position).normalize();
+      
+      // Calculate zoom distance based on current distance
+      const currentDistance = camera.position.distanceTo(controls.target);
+      const zoomSpeed = currentDistance * 0.1;
+      const zoomDistance = delta > 0 ? -zoomSpeed : zoomSpeed;
+      
+      // Apply zoom
+      camera.position.addScaledVector(direction, zoomDistance);
+      
+      // Prevent camera from going too close or too far
+      const minDistance = 0.1;
+      const maxDistance = 100;
+      const newDistance = camera.position.distanceTo(controls.target);
+      
+      if (newDistance < minDistance || newDistance > maxDistance) {
+        // Revert if too close or too far
+        camera.position.addScaledVector(direction, -zoomDistance);
+      }
     } else if (camera.isOrthographicCamera) {
       camera.zoom = Math.max(0.1, camera.zoom + delta * 0.1);
       camera.updateProjectionMatrix();
@@ -117,8 +186,11 @@ export function useThreeScene(canvasRef) {
   };
 
   const resetCamera = () => {
-    if (controlsRef.current) {
-      controlsRef.current.reset();
+    if (controlsRef.current && cameraRef.current) {
+      // Reset to initial position
+      cameraRef.current.position.set(0, 2, 6);
+      controlsRef.current.target.set(0, 0, 0);
+      controlsRef.current.update();
     }
   };
 
