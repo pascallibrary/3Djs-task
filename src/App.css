@@ -5,18 +5,25 @@
   background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
 }
 
-
-/* Mobile: allow scrolling */
+/* Mobile: improve scrolling and viewport handling */
 @media (max-width: 768px) {
   .App {
     height: auto;
     min-height: 100dvh; /* dynamic viewport height */
     overflow-y: auto;   /* enable scrolling */
     -webkit-overflow-scrolling: touch; /* smooth scroll on iOS */
+    overscroll-behavior: contain; /* prevent pull-to-refresh */
     padding-bottom: env(safe-area-inset-bottom, 0);
     padding-top: env(safe-area-inset-top, 0);
     padding-left: env(safe-area-inset-left, 0);
     padding-right: env(safe-area-inset-right, 0);
+  }
+  
+  /* Ensure body allows scrolling on mobile */
+  body {
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    position: relative;
   }
 }
 
@@ -29,7 +36,7 @@
   min-height: 0;
 }
 
-/* Header styles */
+/* Header styles - collapsible on mobile */
 .editor-header {
   background: rgba(31, 41, 55, 0.95);
   backdrop-filter: blur(10px);
@@ -37,24 +44,47 @@
   padding: 1rem;
   z-index: 10;
   flex-shrink: 0;
+  position: relative;
 }
 
-@media (min-width: 640px) {
+@media (max-width: 768px) {
   .editor-header {
-    padding: 1rem;
+    padding: 0.75rem;
+    font-size: 0.9rem;
+    /* Make header more compact on mobile */
+    background: rgba(31, 41, 55, 0.98);
+    position: sticky;
+    top: 0;
+    z-index: 50;
   }
 }
 
-/* Canvas container */
+/* Canvas container - FIXED touch behavior */
 .canvas-container {
   flex: 1;
   position: relative;
   overflow: hidden;
-  min-height: 0;
-  touch-action: none;
+  min-height: 400px; /* Minimum height to ensure usability */
+  /* REMOVE touch-action: none for mobile scrolling */
 }
 
-/* Control panel styles */
+@media (max-width: 768px) {
+  .canvas-container {
+    min-height: 300px;
+    /* Allow touch interactions but prevent default scrolling on canvas */
+    touch-action: pan-x pan-y pinch-zoom;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  
+  /* Canvas element specific touch handling */
+  .canvas-container canvas {
+    touch-action: none; /* Only disable touch on the actual canvas */
+  }
+}
+
+/* Control panel styles - improved mobile UX */
 .control-panel {
   background: rgba(31, 41, 55, 0.95);
   backdrop-filter: blur(10px);
@@ -63,35 +93,76 @@
   flex-shrink: 0;
   max-height: 40vh;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
-@media (min-width: 640px) {
+@media (max-width: 768px) {
   .control-panel {
-    padding: 1rem;
+    padding: 0.75rem;
+    max-height: 35vh; /* Smaller on mobile */
+    font-size: 0.9rem;
+    /* Sticky positioning for better access */
+    position: sticky;
+    bottom: 0;
+    z-index: 40;
+    border-top: 2px solid rgba(75, 85, 99, 0.8);
   }
 }
 
-/* Button hover effects */
+/* Button styles with better mobile touch targets */
 .btn-primary {
   @apply bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-all duration-200 flex items-center gap-2;
+  min-height: 44px; /* iOS recommended touch target */
+  min-width: 44px;
 }
 
 .btn-secondary {
   @apply bg-gray-600 hover:bg-gray-700 text-white font-medium px-4 py-2 rounded-lg transition-all duration-200 flex items-center gap-2;
+  min-height: 44px;
+  min-width: 44px;
 }
 
 .btn-success {
   @apply bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg transition-all duration-200 flex items-center gap-2;
+  min-height: 44px;
+  min-width: 44px;
 }
 
 .btn-danger {
   @apply bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded-lg transition-all duration-200 flex items-center gap-2;
+  min-height: 44px;
+  min-width: 44px;
 }
 
-/* File upload styling */
+/* Mobile button adjustments */
+@media (max-width: 768px) {
+  .btn-primary,
+  .btn-secondary,
+  .btn-success,
+  .btn-danger {
+    @apply px-3 py-2 text-sm;
+    min-height: 40px;
+    min-width: 40px;
+    /* Improve tap response */
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* File upload styling with better mobile UX */
 .file-upload-label {
   @apply bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg cursor-pointer transition-all duration-200 flex items-center gap-2;
-  min-height: 40px;
+  min-height: 44px;
+  min-width: 44px;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 768px) {
+  .file-upload-label {
+    @apply px-3 py-2 text-sm;
+    min-height: 40px;
+    flex: 1;
+    justify-content: center;
+  }
 }
 
 .file-upload-label:hover {
@@ -103,36 +174,30 @@
   transform: translateY(0);
 }
 
-/* Hotspot marker styling */
+/* Hotspot marker styling - larger touch targets on mobile */
 .hotspot-marker {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   background: #ef4444;
   border: 3px solid #ffffff;
   border-radius: 50%;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   cursor: pointer;
   transition: all 0.2s ease;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 768px) {
+  .hotspot-marker {
+    width: 24px; /* Larger on mobile for easier tapping */
+    height: 24px;
+    border-width: 2px;
+  }
 }
 
 .hotspot-marker:hover {
   transform: scale(1.2);
   box-shadow: 0 4px 16px rgba(239, 68, 68, 0.6);
-}
-
-@media (min-width: 640px) {
-  .hotspot-marker {
-    width: 16px;
-    height: 16px;
-  }
-}
-
-@media (min-width: 640px) {
-  .hotspot-label {
-    font-size: 0.875rem;
-    padding: 0.5rem 0.75rem;
-    max-width: 200px;
-  }
 }
 
 .hotspot-label {
@@ -149,7 +214,18 @@
   text-overflow: ellipsis;
 }
 
-/* Loading overlay */
+@media (max-width: 768px) {
+  .hotspot-label {
+    font-size: 0.75rem;
+    padding: 0.375rem 0.5rem;
+    max-width: 150px;
+    white-space: normal; /* Allow wrapping on mobile */
+    word-break: break-word;
+    line-height: 1.3;
+  }
+}
+
+/* Loading overlay with better mobile positioning */
 .loading-overlay {
   position: absolute;
   top: 0;
@@ -172,14 +248,23 @@
   color: #1f2937;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
               0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  max-width: 90vw;
+  margin: 1rem;
 }
 
-/* Error message styling */
+@media (max-width: 768px) {
+  .loading-content {
+    padding: 1.5rem;
+    margin: 1rem;
+  }
+}
+
+/* Error message with mobile positioning */
 .error-message {
-  position: absolute;
+  position: fixed; /* Changed from absolute to fixed */
   top: 1rem;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 1rem;
+  right: 1rem;
   background: #ef4444;
   color: white;
   padding: 0.75rem 1rem;
@@ -187,20 +272,46 @@
   z-index: 1000;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   animation: slideDown 0.3s ease-out;
+  max-width: calc(100vw - 2rem);
+  margin: 0 auto;
+  text-align: center;
+}
+
+@media (min-width: 768px) {
+  .error-message {
+    position: absolute;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    max-width: 400px;
+  }
 }
 
 @keyframes slideDown {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(-20px);
+    transform: translateY(-20px);
   }
   to {
     opacity: 1;
-    transform: translateX(-50%) translateY(0);
+    transform: translateY(0);
   }
 }
 
-/* Welcome screen */
+@media (min-width: 768px) {
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) translateY(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  }
+}
+
+/* Welcome screen with mobile optimization */
 .welcome-screen {
   position: absolute;
   top: 0;
@@ -212,38 +323,92 @@
   justify-content: center;
   text-align: center;
   color: #9ca3af;
+  padding: 1rem;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
-/* Responsive design */
 @media (max-width: 768px) {
-  .editor-header {
-    padding: 0.5rem 0.75rem;
-    font-size: 0.9rem;
+  .welcome-screen {
+    align-items: flex-start;
+    padding-top: 2rem;
   }
+}
 
-  .control-panel {
-    padding: 0.5rem 0.75rem;
-    max-height: 30vh; /* smaller panel */
-    font-size: 0.9rem;
+/* Mobile-specific control improvements */
+@media (max-width: 768px) {
+  /* Control layout adjustments */
+  .editor-header .flex {
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
+  
+  .editor-header .flex > * {
+    flex-shrink: 0;
+  }
+  
+  /* Input field improvements */
+  input[type="text"] {
+    font-size: 16px; /* Prevent zoom on iOS */
+    min-height: 40px;
+    -webkit-appearance: none;
+  }
+  
+  /* Scrollable areas */
+  .control-panel,
+  .welcome-screen {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+  }
+  
+  .control-panel::-webkit-scrollbar,
+  .welcome-screen::-webkit-scrollbar {
+    width: 4px;
+  }
+  
+  .control-panel::-webkit-scrollbar-track,
+  .welcome-screen::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .control-panel::-webkit-scrollbar-thumb,
+  .welcome-screen::-webkit-scrollbar-thumb {
+    background: rgba(156, 163, 175, 0.5);
+    border-radius: 2px;
+  }
+}
 
-  .btn-primary,
-  .btn-secondary,
-  .btn-success,
-  .btn-danger {
-    @apply px-3 py-1.5 text-sm;
-  }
+/* Prevent text selection on interactive elements */
+.canvas-container,
+.hotspot-marker,
+.btn-primary,
+.btn-secondary,
+.btn-success,
+.btn-danger,
+.file-upload-label {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
 
-  .file-upload-label {
-    @apply px-3 py-1.5 text-sm;
-    min-height: 36px;
-  }
+/* Ensure proper stacking context */
+.editor-header {
+  z-index: 50;
+}
 
-  .hotspot-label {
-    font-size: 0.7rem;
-    padding: 0.25rem 0.4rem;
-    max-width: 120px;
-    white-space: normal; /* wrap if needed */
-    word-break: break-word;
-  }
+.canvas-container {
+  z-index: 1;
+}
+
+.control-panel {
+  z-index: 40;
+}
+
+.loading-overlay {
+  z-index: 1000;
+}
+
+.error-message {
+  z-index: 1001;
 }
