@@ -3,7 +3,17 @@
   height: 100vh;
   overflow: hidden;
   background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+  position: relative;
 }
+
+@media (max-width: 768px) {
+  .App {
+    height: 100vh;
+    height: 100dvh; /* Dynamic viewport height for mobile */
+    overflow: hidden;
+  }
+}
+
 
 /* 3D Editor specific styles */
 .editor-container {
@@ -11,6 +21,7 @@
   flex-direction: column;
   height: 100%;
   width: 100%;
+  min-height: 0;
 }
 
 /* Header styles */
@@ -20,6 +31,13 @@
   border-bottom: 1px solid rgba(75, 85, 99, 0.5);
   padding: 1rem;
   z-index: 10;
+  flex-shrink: 0;
+}
+
+@media (min-width: 640px) {
+  .editor-header {
+    padding: 1rem;
+  }
 }
 
 /* Canvas container */
@@ -27,6 +45,8 @@
   flex: 1;
   position: relative;
   overflow: hidden;
+  min-height: 0;
+  touch-action: none;
 }
 
 /* Control panel styles */
@@ -34,7 +54,16 @@
   background: rgba(31, 41, 55, 0.95);
   backdrop-filter: blur(10px);
   border-top: 1px solid rgba(75, 85, 99, 0.5);
-  padding: 1rem;
+  padding: 0.75rem;
+  flex-shrink: 0;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+@media (min-width: 640px) {
+  .control-panel {
+    padding: 1rem;
+  }
 }
 
 /* Button hover effects */
@@ -57,11 +86,16 @@
 /* File upload styling */
 .file-upload-label {
   @apply bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg cursor-pointer transition-all duration-200 flex items-center gap-2;
+  min-height: 40px;
 }
 
 .file-upload-label:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.file-upload-label:active {
+  transform: translateY(0);
 }
 
 /* Hotspot marker styling */
@@ -79,6 +113,21 @@
 .hotspot-marker:hover {
   transform: scale(1.2);
   box-shadow: 0 4px 16px rgba(239, 68, 68, 0.6);
+}
+
+@media (min-width: 640px) {
+  .hotspot-marker {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+@media (min-width: 640px) {
+  .hotspot-label {
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+    max-width: 200px;
+  }
 }
 
 .hotspot-label {

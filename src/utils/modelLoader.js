@@ -71,41 +71,62 @@ export class ModelLoader {
               '', // resource path
               (gltf) => {
                 // Successfully loaded GLTF
-                console.log('GLTF loaded successfully:', gltf);
+                console.log('🎯 GLTF loaded successfully:', gltf);
                 
-                // Extract the scene from GLTF
-                const model = gltf.scene.clone(); // Clone to avoid issues
+                // Extract the scene from GLTF (DO NOT CLONE - causes issues)
+                const model = gltf.scene;
                 
-                // Ensure model is visible
+                // Ensure model has a stable reference
+                if (!model.uuid) {
+                  model.uuid = THREE.MathUtils.generateUUID();
+                }
+                
+                // Ensure model is visible and properly configured
                 model.visible = true;
                 
-                // Force update all materials and geometries
+                // Process all children to ensure they render properly
                 model.traverse((child) => {
                   if (child.isMesh) {
                     child.visible = true;
                     
+                    // Ensure geometry is properly computed
                     if (child.geometry) {
+                      if (!child.geometry.attributes.normal) {
+                        child.geometry.computeVertexNormals();
+                      }
                       child.geometry.computeBoundingBox();
                       child.geometry.computeBoundingSphere();
                     }
                     
+                    // Ensure materials render properly
                     if (child.material) {
                       const materials = Array.isArray(child.material) ? child.material : [child.material];
                       materials.forEach(mat => {
+                        // Prevent invisible materials
+                        if (mat.opacity === 0 && !mat.transparent) {
+                          mat.opacity = 1.0;
+                        }
                         mat.needsUpdate = true;
                       });
                     }
                   }
                 });
                 
-                // Add metadata
+                // Add metadata AFTER processing
                 model.userData = {
                   ...model.userData,
                   fileName: file.name,
                   fileSize: file.size,
                   animations: gltf.animations || [],
-                  isGLTFModel: true
+                  isGLTFModel: true,
+                  loadedAt: Date.now()
                 };
+                
+                console.log('🎯 Model prepared for scene:', {
+                  uuid: model.uuid,
+                  visible: model.visible,
+                  children: model.children.length
+                });
                 
                 resolve(model);
               },
