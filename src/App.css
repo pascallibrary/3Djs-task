@@ -1,19 +1,24 @@
 .App {
   width: 100vw;
-  height: 100vh;
-  overflow: hidden;
+  min-height: 100vh; 
+  overflow-y: auto; 
   background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
-  position: relative;
 }
 
+
+/* Mobile: allow scrolling */
 @media (max-width: 768px) {
   .App {
-    height: 100vh;
-    height: 100dvh; /* Dynamic viewport height for mobile */
-    overflow: hidden;
+    height: auto;
+    min-height: 100dvh; /* dynamic viewport height */
+    overflow-y: auto;   /* enable scrolling */
+    -webkit-overflow-scrolling: touch; /* smooth scroll on iOS */
+    padding-bottom: env(safe-area-inset-bottom, 0);
+    padding-top: env(safe-area-inset-top, 0);
+    padding-left: env(safe-area-inset-left, 0);
+    padding-right: env(safe-area-inset-right, 0);
   }
 }
-
 
 /* 3D Editor specific styles */
 .editor-container {
@@ -165,7 +170,8 @@
   border-radius: 0.75rem;
   text-align: center;
   color: #1f2937;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
+              0 10px 10px -5px rgba(0, 0, 0, 0.04);
 }
 
 /* Error message styling */
@@ -211,23 +217,33 @@
 /* Responsive design */
 @media (max-width: 768px) {
   .editor-header {
-    padding: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9rem;
   }
-  
+
   .control-panel {
-    padding: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    max-height: 30vh; /* smaller panel */
+    font-size: 0.9rem;
   }
-  
+
   .btn-primary,
   .btn-secondary,
   .btn-success,
   .btn-danger {
-    @apply px-3 py-2 text-sm;
+    @apply px-3 py-1.5 text-sm;
   }
-  
+
+  .file-upload-label {
+    @apply px-3 py-1.5 text-sm;
+    min-height: 36px;
+  }
+
   .hotspot-label {
-    font-size: 0.75rem;
-    padding: 0.375rem 0.5rem;
-    max-width: 150px;
+    font-size: 0.7rem;
+    padding: 0.25rem 0.4rem;
+    max-width: 120px;
+    white-space: normal; /* wrap if needed */
+    word-break: break-word;
   }
 }
