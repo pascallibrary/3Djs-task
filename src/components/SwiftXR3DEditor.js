@@ -1,6 +1,6 @@
 import React, { useRef, useReducer, useCallback, useEffect } from 'react';
 import * as THREE from 'three';
-import { Upload, RotateCcw, Move3D, MapPin, Trash2, Eye, EyeOff, Settings } from 'lucide-react';
+import { Upload, RotateCcw, Focus, MapPin, Trash2, Eye, EyeOff, Settings } from 'lucide-react';
 import { useThreeScene } from '../hooks/useThreeScene';
 import { ModelLoader } from '../utils/modelLoader';
 import HotspotOverlay, { HotspotList, HotspotStats } from './HotspotOverlay';
@@ -21,15 +21,7 @@ const initialState = {
   hotspotsVisible: true,
 
   // UI state
-  showStats: false,
-
-  // Mouse state
-  mouseState: {
-    isDown: false,
-    lastX: 0,
-    lastY: 0,
-    button: null
-  }
+  showStats: false
 };
 
 // Reducer function
@@ -99,9 +91,6 @@ function editorReducer(state, action) {
     case 'TOGGLE_STATS':
       return { ...state, showStats: !state.showStats };
 
-    case 'SET_MOUSE_STATE':
-      return { ...state, mouseState: action.payload };
-
     default:
       return state;
   }
@@ -121,15 +110,14 @@ const SwiftXR3DEditor = () => {
   // State management
   const [state, dispatch] = useReducer(editorReducer, initialState);
   
-  // Three.js scene hook
+  // Three.js scene hook - UPDATED to match new hook signature
   const {
     sceneRef,
     cameraRef,
-    rotateCameraBy,
-    panCameraBy,
-    zoomCameraBy,
-    resetCamera,
+    controlsRef,
     addModelToScene,
+    resetCamera,
+    focusOnModel,
     currentModel: hookCurrentModel
   } = useThreeScene(canvasRef);
 
@@ -144,16 +132,27 @@ const SwiftXR3DEditor = () => {
     const file = event.target.files[0];
     if (!file) return;
 
+    // Validate file size (50MB limit)
+    const maxSize = 50 * 1024 * 1024; // 50MB in bytes
+    if (file.size > maxSize) {
+      dispatch({ 
+        type: 'SET_ERROR', 
+        payload: `File size (${(file.size / 1024 / 1024).toFixed(1)}MB) exceeds 50MB limit` 
+      });
+      event.target.value = '';
+      return;
+    }
+
     dispatch({ type: 'SET_LOADING' });
 
     try {
-      console.log('Loading GLB file:', file.name);
+      console.log('Loading GLB file:', file.name, `(${(file.size / 1024 / 1024).toFixed(2)}MB)`);
       
       // Load the model
       const loadedModel = await modelLoaderRef.current.loadGLB(file);
       console.log('Model loaded successfully:', loadedModel);
       
-      // Prepare model for display
+      // Prepare model for display with consistent settings
       const preparedModel = modelLoaderRef.current.prepareModel(loadedModel, {
         center: true,
         scale: true,
@@ -161,110 +160,38 @@ const SwiftXR3DEditor = () => {
         enableShadows: true
       });
 
-      // Add to scene
+      // Add to scene (the hook handles centering and camera positioning)
       const sceneModel = addModelToScene(preparedModel);
       
       // Update state
       dispatch({ type: 'SET_MODEL_LOADED', payload: sceneModel });
       
-      console.log('Model added to scene:', sceneModel);
+      console.log('Model added to scene and centered:', sceneModel);
 
     } catch (error) {
       console.error('Error loading model:', error);
-      dispatch({ type: 'SET_ERROR', payload: error.message });
+      dispatch({ type: 'SET_ERROR', payload: `Failed to load model: ${error.message}` });
     }
 
     // Reset file input
     event.target.value = '';
   }, [addModelToScene]);
 
-  // === MOUSE HANDLING ===
-  
-  const handleMouseDown = useCallback((event) => {
-    if (!canvasRef.current) return;
-
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-
-    // Handle hotspot placement
-    if (state.isAddingHotspot && state.isModelLoaded && state.newHotspotLabel.trim()) {
-      handleHotspotPlacement(x, y);
-      return;
-    }
-
-    // Handle camera controls
-    if (state.isModelLoaded && !state.isAddingHotspot) {
-      dispatch({ 
-        type: 'SET_MOUSE_STATE', 
-        payload: {
-          isDown: true,
-          lastX: x,
-          lastY: y,
-          button: event.button
-        }
-      });
-    }
-  }, [state.isAddingHotspot, state.isModelLoaded, state.newHotspotLabel]);
-
-  const handleMouseMove = useCallback((event) => {
-    if (!state.mouseState.isDown || !canvasRef.current) return;
-
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-
-    const deltaX = x - state.mouseState.lastX;
-    const deltaY = y - state.mouseState.lastY;
-
-    if (state.mouseState.button === 0) {
-      // Left mouse - rotate
-      rotateCameraBy(deltaX, deltaY);
-    } else if (state.mouseState.button === 2) {
-      // Right mouse - pan
-      panCameraBy(deltaX, deltaY);
-    }
-
-    dispatch({ 
-      type: 'SET_MOUSE_STATE', 
-      payload: {
-        ...state.mouseState,
-        lastX: x,
-        lastY: y
-      }
-    });
-  }, [state.mouseState, rotateCameraBy, panCameraBy]);
-
-  const handleMouseUp = useCallback(() => {
-    dispatch({ 
-      type: 'SET_MOUSE_STATE', 
-      payload: {
-        ...state.mouseState,
-        isDown: false,
-        button: null
-      }
-    });
-  }, [state.mouseState]);
-
-  const handleWheel = useCallback((event) => {
-    if (!state.isModelLoaded) return;
-    
-    event.preventDefault();
-    const delta = event.deltaY > 0 ? 1 : -1;
-    zoomCameraBy(delta);
-  }, [state.isModelLoaded, zoomCameraBy]);
-
   // === HOTSPOT HANDLING ===
   
-  const handleHotspotPlacement = useCallback((screenX, screenY) => {
+  const handleCanvasClick = useCallback((event) => {
+    if (!canvasRef.current || !state.isAddingHotspot || !state.newHotspotLabel.trim()) return;
+
     const currentModel = getCurrentModel();
-    if (!currentModel || !state.newHotspotLabel.trim()) return;
+    if (!currentModel) return;
 
     const rect = canvasRef.current.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
     
     // Convert to normalized coordinates
-    mouseRef.current.x = ((screenX / rect.width) * 2) - 1;
-    mouseRef.current.y = -((screenY / rect.height) * 2) + 1;
+    mouseRef.current.x = ((x / rect.width) * 2) - 1;
+    mouseRef.current.y = -((y / rect.height) * 2) + 1;
 
     // Raycast
     raycasterRef.current.setFromCamera(mouseRef.current, cameraRef.current);
@@ -281,13 +208,13 @@ const SwiftXR3DEditor = () => {
           y: point.y,
           z: point.z
         },
-        screenPosition: { x: screenX, y: screenY },
+        screenPosition: { x, y },
         createdAt: new Date().toISOString()
       };
 
       dispatch({ type: 'ADD_HOTSPOT', payload: newHotspot });
     }
-  }, [getCurrentModel, state.newHotspotLabel]);
+  }, [getCurrentModel, state.isAddingHotspot, state.newHotspotLabel]);
 
   // === EVENT HANDLERS ===
   
@@ -307,37 +234,18 @@ const SwiftXR3DEditor = () => {
     dispatch({ type: 'CLEAR_ALL_HOTSPOTS' });
   }, []);
 
-  const getCursorStyle = useCallback(() => {
-    if (state.isAddingHotspot) return 'canvas-hotspot';
-    if (state.mouseState.isDown) {
-      return state.mouseState.button === 2 ? 'canvas-pan' : 'canvas-rotate';
-    }
-    return 'canvas-rotate';
-  }, [state.isAddingHotspot, state.mouseState]);
-
   // === EVENT LISTENERS ===
   
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    canvas.addEventListener('mousedown', handleMouseDown);
-    canvas.addEventListener('mousemove', handleMouseMove);
-    canvas.addEventListener('mouseup', handleMouseUp);
-    canvas.addEventListener('wheel', handleWheel);
-    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-
-    document.addEventListener('mouseup', handleMouseUp);
+    canvas.addEventListener('click', handleCanvasClick);
 
     return () => {
-      canvas.removeEventListener('mousedown', handleMouseDown);
-      canvas.removeEventListener('mousemove', handleMouseMove);
-      canvas.removeEventListener('mouseup', handleMouseUp);
-      canvas.removeEventListener('wheel', handleWheel);
-      canvas.removeEventListener('contextmenu', (e) => e.preventDefault());
-      document.removeEventListener('mouseup', handleMouseUp);
+      canvas.removeEventListener('click', handleCanvasClick);
     };
-  }, [handleMouseDown, handleMouseMove, handleMouseUp, handleWheel]);
+  }, [handleCanvasClick]);
 
   // === RENDER ===
   
@@ -381,6 +289,11 @@ const SwiftXR3DEditor = () => {
               <button onClick={resetCamera} className="btn-secondary">
                 <RotateCcw size={18} />
                 Reset View
+              </button>
+
+              <button onClick={focusOnModel} className="btn-secondary">
+                <Focus size={18} />
+                Focus Model
               </button>
 
               {/* Hotspot Controls */}
@@ -439,6 +352,7 @@ const SwiftXR3DEditor = () => {
               <span><strong>Rotate:</strong> Left click + drag</span>
               <span><strong>Pan:</strong> Right click + drag</span>
               <span><strong>Zoom:</strong> Mouse wheel</span>
+              <span><strong>Hotspots:</strong> Click on model to place</span>
             </div>
             {state.isAddingHotspot && state.newHotspotLabel.trim() && (
               <div className="text-yellow-400">
@@ -466,7 +380,7 @@ const SwiftXR3DEditor = () => {
       <div className="flex-1 relative canvas-container">
         <canvas 
           ref={canvasRef}
-          className={`w-full h-full ${getCursorStyle()}`}
+          className="w-full h-full cursor-pointer"
         />
 
         {/* Overlays */}
@@ -518,19 +432,19 @@ const SwiftXR3DEditor = () => {
                 <div className="p-6 bg-gray-800 bg-opacity-50 rounded-lg border border-gray-700">
                   <Upload size={32} className="mx-auto mb-3 text-blue-400" />
                   <h3 className="font-semibold text-white mb-2">1. Import Model</h3>
-                  <p className="text-sm text-gray-400">Upload GLB/GLTF 3D model files</p>
+                  <p className="text-sm text-gray-400">Upload GLB/GLTF files up to 50MB</p>
                 </div>
                 
                 <div className="p-6 bg-gray-800 bg-opacity-50 rounded-lg border border-gray-700">
-                  <Move3D size={32} className="mx-auto mb-3 text-green-400" />
+                  <RotateCcw size={32} className="mx-auto mb-3 text-green-400" />
                   <h3 className="font-semibold text-white mb-2">2. Navigate</h3>
-                  <p className="text-sm text-gray-400">Rotate, pan, and zoom to explore</p>
+                  <p className="text-sm text-gray-400">Use OrbitControls to rotate, pan, and zoom</p>
                 </div>
                 
                 <div className="p-6 bg-gray-800 bg-opacity-50 rounded-lg border border-gray-700">
                   <MapPin size={32} className="mx-auto mb-3 text-red-400" />
                   <h3 className="font-semibold text-white mb-2">3. Label</h3>
-                  <p className="text-sm text-gray-400">Add hotspots to label parts</p>
+                  <p className="text-sm text-gray-400">Click to add hotspot annotations</p>
                 </div>
               </div>
 
@@ -567,8 +481,11 @@ const SwiftXR3DEditor = () => {
                   <div>Visible: {model.visible ? 'Yes' : 'No'}</div>
                   <div>In Scene: {inScene ? 'Yes' : 'No'}</div>
                   <div>Children: {model.children.length}</div>
+                  <div>Position: {model.position.x.toFixed(2)}, {model.position.y.toFixed(2)}, {model.position.z.toFixed(2)}</div>
+                  <div>Scale: {model.scale.x.toFixed(2)}</div>
                   <div>Hotspots: {state.hotspots.length}</div>
                   <div>Scene Objects: {sceneRef.current?.children.length || 0}</div>
+                  <div>Camera Distance: {cameraRef.current ? cameraRef.current.position.distanceTo(controlsRef.current?.target || new THREE.Vector3(0,0,0)).toFixed(2) : 'N/A'}</div>
                 </>
               );
             })()}

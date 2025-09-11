@@ -1,4 +1,3 @@
-// src/hooks/useThreeScene.js
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
@@ -9,13 +8,13 @@ export function useThreeScene(canvasRef) {
   const rendererRef = useRef();
   const controlsRef = useRef();
   const currentModelRef = useRef();
+  const animationIdRef = useRef();
 
   useEffect(() => {
     if (!canvasRef.current) return;
 
     // === Scene ===
     const scene = new THREE.Scene();
-    // Dark background OR transparent
     scene.background = new THREE.Color(0x111827);
     sceneRef.current = scene;
 
@@ -26,47 +25,84 @@ export function useThreeScene(canvasRef) {
       0.1,
       1000
     );
-    camera.position.set(0, 2, 6);
+    camera.position.set(0, 2, 8);
     cameraRef.current = camera;
 
     // === Renderer ===
-    const renderer = new THREE.WebGLRenderer({ canvas: canvasRef.current, antialias: true });
+    const renderer = new THREE.WebGLRenderer({ 
+      canvas: canvasRef.current, 
+      antialias: true,
+      alpha: false
+    });
     renderer.setSize(canvasRef.current.clientWidth, canvasRef.current.clientHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1;
     rendererRef.current = renderer;
 
-    // === Controls ===
+    // === Controls - Use OrbitControls properly ===
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.enablePan = true;
-    controls.enableZoom = true; // Enable zoom through OrbitControls
-    controls.enableRotate = false; // Disable automatic rotation, we'll handle it manually
+    controls.enableZoom = true;
+    controls.enableRotate = true; // Enable proper rotation
+    
+    // Set reasonable bounds
+    controls.minDistance = 1;
+    controls.maxDistance = 50;
+    controls.maxPolarAngle = Math.PI; // Allow full rotation
+    controls.minPolarAngle = 0;
+    
+    // Target stays at origin
+    controls.target.set(0, 0, 0);
     controlsRef.current = controls;
 
-    // === Lights ===
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
+    // === Enhanced Lighting ===
+    // Hemisphere light for overall illumination
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.8);
     hemiLight.position.set(0, 20, 0);
     scene.add(hemiLight);
 
+    // Main directional light with shadows
     const dirLight = new THREE.DirectionalLight(0xffffff, 1);
-    dirLight.position.set(5, 10, 7);
+    dirLight.position.set(10, 10, 5);
     dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 2048;
+    dirLight.shadow.mapSize.height = 2048;
+    dirLight.shadow.camera.near = 0.1;
+    dirLight.shadow.camera.far = 50;
+    dirLight.shadow.camera.left = -10;
+    dirLight.shadow.camera.right = 10;
+    dirLight.shadow.camera.top = 10;
+    dirLight.shadow.camera.bottom = -10;
     scene.add(dirLight);
+
+    // Fill light
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
+    fillLight.position.set(-5, 5, -5);
+    scene.add(fillLight);
 
     // === Ground ===
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(100, 100),
-      new THREE.MeshPhongMaterial({ color: 0x222222, depthWrite: false })
+      new THREE.MeshLambertMaterial({ 
+        color: 0x333333, 
+        transparent: true,
+        opacity: 0.8
+      })
     );
     ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.01; // Slightly below origin
     ground.receiveShadow = true;
     scene.add(ground);
 
     // === Animate Loop ===
     const animate = () => {
-      requestAnimationFrame(animate);
+      animationIdRef.current = requestAnimationFrame(animate);
       controls.update();
       renderer.render(scene, camera);
     };
@@ -75,159 +111,169 @@ export function useThreeScene(canvasRef) {
     // === Handle Resize ===
     const handleResize = () => {
       if (!canvasRef.current) return;
-      camera.aspect = canvasRef.current.clientWidth / canvasRef.current.clientHeight;
+      
+      const width = canvasRef.current.clientWidth;
+      const height = canvasRef.current.clientHeight;
+      
+      camera.aspect = width / height;
       camera.updateProjectionMatrix();
-      renderer.setSize(canvasRef.current.clientWidth, canvasRef.current.clientHeight);
+      renderer.setSize(width, height);
     };
     window.addEventListener('resize', handleResize);
 
     return () => {
+      // Cleanup
+      if (animationIdRef.current) {
+        cancelAnimationFrame(animationIdRef.current);
+      }
       window.removeEventListener('resize', handleResize);
+      
+      // Dispose Three.js resources
+      scene.traverse((child) => {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) {
+          if (Array.isArray(child.material)) {
+            child.material.forEach(mat => mat.dispose());
+          } else {
+            child.material.dispose();
+          }
+        }
+      });
+      
       renderer.dispose();
+      controls.dispose();
     };
   }, [canvasRef]);
 
-  // === Manual Camera Controls ===
-  const rotateCameraBy = (dx, dy) => {
-    if (!controlsRef.current || !cameraRef.current) return;
-    
-    const controls = controlsRef.current;
-    const camera = cameraRef.current;
-    
-    // Get current spherical coordinates
-    const spherical = new THREE.Spherical();
-    const offset = new THREE.Vector3();
-    
-    // Calculate offset from target
-    offset.copy(camera.position).sub(controls.target);
-    spherical.setFromVector3(offset);
-    
-    // Apply rotation deltas
-    spherical.theta -= dx * 0.01; // Horizontal rotation
-    spherical.phi += dy * 0.01;   // Vertical rotation
-    
-    // Constrain phi to avoid flipping
-    spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
-    
-    // Convert back to cartesian coordinates
-    offset.setFromSpherical(spherical);
-    camera.position.copy(controls.target).add(offset);
-    
-    // Update controls
-    controls.update();
-  };
-
-  const panCameraBy = (dx, dy) => {
-    if (!controlsRef.current || !cameraRef.current) return;
-    
-    const controls = controlsRef.current;
-    const camera = cameraRef.current;
-    
-    // Get camera's right and up vectors
-    const cameraDirection = new THREE.Vector3();
-    camera.getWorldDirection(cameraDirection);
-    
-    const right = new THREE.Vector3();
-    right.crossVectors(cameraDirection, camera.up).normalize();
-    
-    const up = new THREE.Vector3();
-    up.crossVectors(right, cameraDirection).normalize();
-    
-    // Calculate pan distance based on camera distance from target
-    const distance = camera.position.distanceTo(controls.target);
-    const panSpeed = distance * 0.001;
-    
-    // Apply panning
-    const panOffset = new THREE.Vector3();
-    panOffset.addScaledVector(right, -dx * panSpeed);
-    panOffset.addScaledVector(up, dy * panSpeed);
-    
-    // Move both camera and target
-    camera.position.add(panOffset);
-    controls.target.add(panOffset);
-    
-    controls.update();
-  };
-
-  const zoomCameraBy = (delta) => {
-    if (!cameraRef.current || !controlsRef.current) return;
-    
-    const camera = cameraRef.current;
-    const controls = controlsRef.current;
-
-    if (camera.isPerspectiveCamera) {
-      // Calculate zoom direction (towards/away from target)
-      const direction = new THREE.Vector3();
-      direction.subVectors(controls.target, camera.position).normalize();
-      
-      // Calculate zoom distance based on current distance
-      const currentDistance = camera.position.distanceTo(controls.target);
-      const zoomSpeed = currentDistance * 0.1;
-      const zoomDistance = delta > 0 ? -zoomSpeed : zoomSpeed;
-      
-      // Apply zoom
-      camera.position.addScaledVector(direction, zoomDistance);
-      
-      // Prevent camera from going too close or too far
-      const minDistance = 0.1;
-      const maxDistance = 100;
-      const newDistance = camera.position.distanceTo(controls.target);
-      
-      if (newDistance < minDistance || newDistance > maxDistance) {
-        // Revert if too close or too far
-        camera.position.addScaledVector(direction, -zoomDistance);
-      }
-    } else if (camera.isOrthographicCamera) {
-      camera.zoom = Math.max(0.1, camera.zoom + delta * 0.1);
-      camera.updateProjectionMatrix();
-    }
-
-    controls.update();
-  };
-
-  const resetCamera = () => {
-    if (controlsRef.current && cameraRef.current) {
-      // Reset to initial position
-      cameraRef.current.position.set(0, 2, 6);
-      controlsRef.current.target.set(0, 0, 0);
-      controlsRef.current.update();
-    }
-  };
-
+  // === Model Management ===
   const addModelToScene = (model) => {
     if (!sceneRef.current) return null;
 
-    // Remove old model
+    // Remove old model with proper cleanup
     if (currentModelRef.current) {
-      sceneRef.current.remove(currentModelRef.current);
+      const oldModel = currentModelRef.current;
+      sceneRef.current.remove(oldModel);
+      
+      // Dispose old model resources
+      oldModel.traverse((child) => {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) {
+          if (Array.isArray(child.material)) {
+            child.material.forEach(mat => mat.dispose());
+          } else {
+            child.material.dispose();
+          }
+        }
+      });
     }
 
-    // Center model
+    // Calculate model bounds
     const box = new THREE.Box3().setFromObject(model);
+    const size = new THREE.Vector3();
     const center = new THREE.Vector3();
+    
+    box.getSize(size);
     box.getCenter(center);
+
+    // Center the model at origin
     model.position.sub(center);
 
+    // Scale model to fit in view (target size of 4 units)
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const targetSize = 4; // FIXED: Define targetSize before using it
+    
+    if (maxDim > 0) {
+      const scale = targetSize / maxDim;
+      model.scale.multiplyScalar(scale);
+    }
+
+    // Add to scene
     sceneRef.current.add(model);
     currentModelRef.current = model;
 
-    // Focus camera on model
-    if (controlsRef.current) {
-      controlsRef.current.target.set(0, 0, 0);
-      controlsRef.current.update();
+    // Position camera for optimal viewing
+    if (controlsRef.current && cameraRef.current) {
+      const controls = controlsRef.current;
+      const camera = cameraRef.current;
+      
+      // Reset target to origin
+      controls.target.set(0, 0, 0);
+      
+      // Position camera based on model size (using targetSize, not scaledSize)
+      const distance = targetSize * 2.5; // Good viewing distance
+      
+      camera.position.set(distance * 0.7, distance * 0.5, distance);
+      camera.lookAt(0, 0, 0);
+      
+      // Update camera bounds based on model size
+      controls.minDistance = targetSize * 0.5;
+      controls.maxDistance = targetSize * 10;
+      
+      controls.update();
     }
 
+    // Enable shadows on model
+    model.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        
+        // Ensure materials are properly configured
+        if (child.material) {
+          if (Array.isArray(child.material)) {
+            child.material.forEach(mat => {
+              if (mat.map) mat.map.flipY = false; // Fix texture orientation
+            });
+          } else {
+            if (child.material.map) child.material.map.flipY = false;
+          }
+        }
+      }
+    });
+
     return model;
+  };
+
+  const resetCamera = () => {
+    if (!controlsRef.current || !cameraRef.current) return;
+    
+    const controls = controlsRef.current;
+    const camera = cameraRef.current;
+    
+    // Reset to a good default position
+    const distance = controls.maxDistance * 0.3;
+    camera.position.set(distance * 0.7, distance * 0.5, distance);
+    controls.target.set(0, 0, 0);
+    controls.update();
+  };
+
+  const focusOnModel = () => {
+    if (!currentModelRef.current || !controlsRef.current || !cameraRef.current) return;
+    
+    const model = currentModelRef.current;
+    const controls = controlsRef.current;
+    const camera = cameraRef.current;
+    
+    // Calculate optimal camera position
+    const box = new THREE.Box3().setFromObject(model);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const distance = maxDim * 2.5;
+    
+    camera.position.set(distance * 0.7, distance * 0.5, distance);
+    controls.target.set(0, 0, 0);
+    controls.update();
   };
 
   return {
     sceneRef,
     cameraRef,
-    rotateCameraBy,
-    panCameraBy,
-    zoomCameraBy,
-    resetCamera,
+    controlsRef,
     addModelToScene,
+    resetCamera,
+    focusOnModel,
     currentModel: currentModelRef.current
   };
 }
